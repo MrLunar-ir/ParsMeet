@@ -1,7 +1,7 @@
 from .bot import Bot, Markdown
 from .client import Client
-from .models import Room, User
-from .exceptions import ParsMeetError, ParsMeetAuthError
+from .models import User, Room, CodePayload
+from .exceptions import ParsMeetError, ParsMeetAuthError, ParsMeetRoomNotFoundError
 from .database import Database
 
-__all__ = ["Bot", "Markdown", "Client", "Room", "User", "ParsMeetError", "ParsMeetAuthError", "Database"]
+__all__ = ["Bot", "Markdown", "Client", "User", "Room", "CodePayload", "ParsMeetError", "ParsMeetAuthError", "ParsMeetRoomNotFoundError", "Database"]

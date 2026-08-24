@@ -3,6 +3,7 @@ import httpx
 import threading
 import time
 import re
+import requests
 from .api.auth import AuthAPI
 from .api.rooms import RoomsAPI
 from .database import Database
@@ -32,8 +33,8 @@ class Bot:
             headers={"Authorization": f"Bearer {token}"},
             timeout=None
         )
-        self.auth = AuthAPI(self._http_client)
-        self.rooms = RoomsAPI(self._http_client, self.loop)
+        self.auth = AuthAPI(self._http_client, token)
+        self.rooms = RoomsAPI(self._http_client, token, self.loop)
         self._handlers = {}
         self.db = Database()
         self._last_update_id = 0
@@ -53,70 +54,67 @@ class Bot:
     def _run(self, coro):
         return self.loop.run_until_complete(coro)
 
-    def _trigger(self, event_name: str, data):
-        if event_name in self._handlers:
-            for handler in self._handlers[event_name]:
-                handler(data)
+    def _trigger(self, event_name, data):
+        for handler in self._handlers.get(event_name, []):
+            handler(data)
 
-    def on_save_message(self, func=None):
+    def message(self, func=None):
         def decorator(actual_func):
-            if "save_message" not in self._handlers:
-                self._handlers["save_message"] = []
-            self._handlers["save_message"].append(actual_func)
+            self._handlers.setdefault("message", []).append(actual_func)
             return actual_func
-        if func is None:
-            return decorator
-        return decorator(func)
+        return decorator(func) if func else decorator
 
-    def on_message_group(self, func=None):
+    def callback(self, func=None):
         def decorator(actual_func):
-            if "message_group" not in self._handlers:
-                self._handlers["message_group"] = []
-            self._handlers["message_group"].append(actual_func)
+            self._handlers.setdefault("callback", []).append(actual_func)
             return actual_func
-        if func is None:
-            return decorator
-        return decorator(func)
+        return decorator(func) if func else decorator
 
-    def on_send_message(self, func=None):
-        def decorator(actual_func):
-            if "send_message" not in self._handlers:
-                self._handlers["send_message"] = []
-            self._handlers["send_message"].append(actual_func)
-            return actual_func
-        if func is None:
-            return decorator
-        return decorator(func)
-
-    def on_callback_query(self, func=None):
-        def decorator(actual_func):
-            if "callback_query" not in self._handlers:
-                self._handlers["callback_query"] = []
-            self._handlers["callback_query"].append(actual_func)
-            return actual_func
-        if func is None:
-            return decorator
-        return decorator(func)
-
-    def send_message(self, chat_id: str, text: str, parse_mode: str = "Markdown", reply_markup: dict = None) -> dict:
+    def send_message(self, chat_id, text, parse_mode="Markdown", reply_markup=None):
         result = self._run(self.rooms._send_message(chat_id, text, parse_mode, reply_markup))
         self._trigger("send_message", {"chat_id": chat_id, "text": text})
         return result
 
-    def edit_message(self, chat_id: str, message_id: int, text: str, parse_mode: str = "Markdown", reply_markup: dict = None) -> dict:
+    def edit_message(self, chat_id, message_id, text, parse_mode="Markdown", reply_markup=None):
         return self._run(self.rooms._edit_message(chat_id, message_id, text, parse_mode, reply_markup))
 
-    def delete_message(self, chat_id: str, message_id: int) -> dict:
+    def delete_message(self, chat_id, message_id):
         return self._run(self.rooms._delete_message(chat_id, message_id))
 
-    def send_photo(self, chat_id: str, photo: str, caption: str = "", parse_mode: str = "Markdown", reply_markup: dict = None) -> dict:
-        return self._run(self.rooms._send_photo(chat_id, photo, caption, parse_mode, reply_markup))
+    def reply_message(self, chat_id, message_id, text, parse_mode="Markdown"):
+        return self._run(self.rooms._reply_message(chat_id, message_id, text, parse_mode))
 
-    def send_document(self, chat_id: str, document: str, caption: str = "", parse_mode: str = "Markdown", reply_markup: dict = None) -> dict:
-        return self._run(self.rooms._send_document(chat_id, document, caption, parse_mode, reply_markup))
+    def send_photo(self, chat_id, photo, caption="", parse_mode="Markdown"):
+        return self._run(self.rooms._send_photo(chat_id, photo, caption, parse_mode))
 
-    def set_my_commands(self, commands: list) -> dict:
+    def send_document(self, chat_id, document, caption="", parse_mode="Markdown"):
+        return self._run(self.rooms._send_document(chat_id, document, caption, parse_mode))
+
+    def set_my_commands(self, commands):
         return self._run(self.rooms._set_my_commands(commands))
+
+    def ask_ai(self, prompt, system_prompt=""):
+        url = f"https://api.pollinations.ai/prompt/{prompt}"
+        if system_prompt:
+            url += f"?system={system_prompt}"
+        response = requests.get(url)
+        return response.text
+
+    def broadcast_message(self, text, parse_mode="Markdown"):
+        chat_ids = self.db.get_all_chat_ids()
+        sent_count = 0
+        for chat_id in chat_ids:
+            try:
+                self.send_message(chat_id, text, parse_mode)
+                sent_count += 1
+            except Exception:
+                pass
+        return {"sent": sent_count, "total": len(chat_ids)}
+
+    def send_to_user(self, user_id, text, parse_mode="Markdown"):
+        if not self.db.user_exists(user_id):
+            raise Exception("User not found")
+        return self.send_message(user_id, text, parse_mode)
 
     def enable_ads_filter(self):
         self._ads_filter_enabled = True
@@ -126,9 +124,8 @@ class Bot:
         self._ads_filter_enabled = False
         print("Ads filter disabled.")
 
-    def auto_send(self, interval: int, callback_func):
+    def auto_send(self, interval, callback_func):
         def run_auto():
-            self._stop_auto = False
             while not self._stop_auto:
                 time.sleep(interval)
                 if self._stop_auto:
@@ -147,7 +144,6 @@ class Bot:
             try:
                 cmd = input(f"{YELLOW}bot Console >>>{RESET} ").strip().lower()
                 if cmd == "bot.off()":
-                    print("Shutting down bot...")
                     self.off()
                     break
                 elif cmd == "bot.pause()":
@@ -163,8 +159,33 @@ class Bot:
                     self.enable_ads_filter()
                 elif cmd == "bot.filter.off()":
                     self.disable_ads_filter()
+                elif cmd == "ask ":
+                    prompt = cmd[4:].strip()
+                    if prompt:
+                        answer = self.ask_ai(prompt)
+                        print(f"AI: {answer}")
+                    else:
+                        print("Usage: ask <question>")
+                elif cmd.startswith("broadcast "):
+                    msg = cmd[10:].strip()
+                    if msg:
+                        result = self.broadcast_message(msg)
+                        print(f"Broadcast sent to {result['sent']} of {result['total']} users.")
+                    else:
+                        print("Usage: broadcast <message>")
+                elif cmd.startswith("send "):
+                    parts = cmd.split(" ", 2)
+                    if len(parts) < 3:
+                        print("Usage: send <user_id> <message>")
+                        continue
+                    user_id, msg = parts[1], parts[2].strip()
+                    try:
+                        self.send_to_user(user_id, msg)
+                        print(f"Message sent to {user_id}.")
+                    except Exception as e:
+                        print(f"Error: {e}")
                 else:
-                    print("Invalid command. Valid: bot.off(), bot.pause(), bot.on(), bot.filter.on(), bot.filter.off()")
+                    print("Invalid command. Valid: bot.off(), bot.pause(), bot.on(), bot.filter.on(), bot.filter.off(), ask <question>, broadcast <message>, send <user_id> <message>")
             except EOFError:
                 break
 
@@ -174,11 +195,9 @@ class Bot:
         self._paused = False
 
     def _check_ads(self, text):
-        if not self._ads_filter_enabled:
-            return False
-        return bool(self._ads_pattern.search(text))
+        return bool(self._ads_filter_enabled and self._ads_pattern.search(text))
 
-    async def _get_updates(self, timeout: int = 5) -> list:
+    async def _get_updates(self, timeout=5):
         if self._paused:
             await asyncio.sleep(1)
             return []
@@ -192,10 +211,10 @@ class Bot:
             return []
         return []
 
-    def run(self, timeout: int = 5):
+    def run(self, timeout=5):
         print(f"Bot {self.get_me()} is running...")
         print("Type 'bot.off()' to stop, 'bot.pause()' to pause, 'bot.on()' to resume.")
-        print("Type 'bot.filter.on()' to enable ads filter, 'bot.filter.off()' to disable.")
+        print("Type 'ask <question>' to ask AI, 'broadcast <message>' to send to all, 'send <user_id> <message>' to send to one.")
         self._input_thread = threading.Thread(target=self._listen_input, daemon=True)
         self._input_thread.start()
         while not self._stop:
@@ -210,18 +229,14 @@ class Bot:
                     chat_id = msg["chat"]["id"]
                     text = msg.get("text", "")
                     username = msg.get("from", {}).get("username", "Unknown")
-
-                    # فیلتر تبلیغات
                     if self._check_ads(text):
                         try:
                             self.delete_message(chat_id, msg["message_id"])
                             print(f"Deleted ad message from {username}: {text}")
                         except Exception:
                             pass
-
                     self.db.save_message(chat_id, text)
-                    self._trigger("save_message", {"chat_id": chat_id, "text": text, "username": username})
-                    self._trigger("message_group", {"chat_id": chat_id, "text": text, "username": username})
+                    self._trigger("message", {"chat_id": chat_id, "text": text, "username": username})
                 elif "callback_query" in update:
                     cb = update["callback_query"]
                     self._last_update_id = update["update_id"]
@@ -229,12 +244,12 @@ class Bot:
                     message_id = cb["message"]["message_id"]
                     callback_data = cb.get("data", "")
                     username = cb.get("from", {}).get("username", "Unknown")
-                    self._trigger("callback_query", {"chat_id": chat_id, "message_id": message_id, "data": callback_data, "username": username})
+                    self._trigger("callback", {"chat_id": chat_id, "message_id": message_id, "data": callback_data, "username": username})
         self.close()
         print("Bot stopped.")
 
     def get_me(self):
-        return self._run(self.auth._login("", ""))
+        return self._run(self.auth._login())
 
     def close(self):
         self.stop_auto_send()
