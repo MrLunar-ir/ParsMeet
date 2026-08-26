@@ -3,256 +3,206 @@ import httpx
 import threading
 import time
 import re
-import requests
 from .api.auth import AuthAPI
 from .api.rooms import RoomsAPI
 from .database import Database
 
 class Markdown:
-    @staticmethod
     def bold(text): return f"**{text}**"
-    @staticmethod
     def italic(text): return f"__{text}__"
-    @staticmethod
     def code(text): return f"`{text}`"
-    @staticmethod
     def spoiler(text): return f"||{text}||"
-    @staticmethod
     def link(text, url): return f"[{text}]({url})"
 
-YELLOW = "\033[93m"
-RESET = "\033[0m"
-
 class Bot:
-    def __init__(self, token: str, base_url: str = "https://botapi.codemeet.chat"):
+    def __init__(self, token, base_url="https://botapi.codemeet.chat", ai_key=None):
         self.token = token
         self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-        self._http_client = httpx.AsyncClient(
-            base_url=base_url,
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=None
-        )
-        self.auth = AuthAPI(self._http_client, token)
-        self.rooms = RoomsAPI(self._http_client, token, self.loop)
-        self._handlers = {}
+        self._http = httpx.AsyncClient(base_url=base_url, headers={"Authorization": f"Bearer {token}"}, timeout=None)
+        self.auth = AuthAPI(self._http, token)
+        self.rooms = RoomsAPI(self._http, token, self.loop)
         self.db = Database()
-        self._last_update_id = 0
-        self._auto_task = None
-        self._stop_auto = False
+        self._handlers = {}
+        self._last_update = 0
         self._stop = False
         self._paused = False
-        self._input_thread = None
-        self._ads_filter_enabled = False
-        self._ads_pattern = re.compile(
-            r'(https?://|www\.|t\.me/|@\w+|telegram\.me|bit\.ly|tinyurl\.com|'
-            r'@[a-zA-Z0-9_]{4,}|[0-9]{5,}|joinchat|/join/|ads?|promo|'
-            r'\b(?:ad|sponsor|buy now|click here|offer|discount|free)\b)',
-            re.IGNORECASE
-        )
+        self._ads_on = False
+        self._ads_pattern = re.compile(r'(https?://|@\w+|telegram\.me|bit\.ly|tinyurl\.com|ads?|promo|discount|free)', re.I)
+        self.ai_key = ai_key
+        self.ai_model = "gpt-3.5-turbo"
 
     def _run(self, coro):
         return self.loop.run_until_complete(coro)
 
-    def _trigger(self, event_name, data):
-        for handler in self._handlers.get(event_name, []):
-            handler(data)
+    def _fire(self, event, data):
+        for cb in self._handlers.get(event, []):
+            cb(data)
 
-    def message(self, func=None):
-        def decorator(actual_func):
-            self._handlers.setdefault("message", []).append(actual_func)
-            return actual_func
-        return decorator(func) if func else decorator
+    def on_message_all(self, func=None):
+        def wrap(f):
+            self._handlers.setdefault("message", []).append(f)
+            return f
+        return wrap(func) if func else wrap
 
-    def callback(self, func=None):
-        def decorator(actual_func):
-            self._handlers.setdefault("callback", []).append(actual_func)
-            return actual_func
-        return decorator(func) if func else decorator
+    def on_callback_query(self, func=None):
+        def wrap(f):
+            self._handlers.setdefault("callback", []).append(f)
+            return f
+        return wrap(func) if func else wrap
+
+    def create_callback(self, text, data):
+        return {"text": text, "callback_data": data}
 
     def send_message(self, chat_id, text, parse_mode="Markdown", reply_markup=None):
-        result = self._run(self.rooms._send_message(chat_id, text, parse_mode, reply_markup))
-        self._trigger("send_message", {"chat_id": chat_id, "text": text})
-        return result
+        res = self._run(self.rooms._send_message(chat_id, text, parse_mode, reply_markup))
+        return res
 
-    def edit_message(self, chat_id, message_id, text, parse_mode="Markdown", reply_markup=None):
-        return self._run(self.rooms._edit_message(chat_id, message_id, text, parse_mode, reply_markup))
+    def reply_message(self, chat_id, msg_id, text, parse_mode="Markdown"):
+        return self._run(self.rooms._reply_message(chat_id, msg_id, text, parse_mode))
 
-    def delete_message(self, chat_id, message_id):
-        return self._run(self.rooms._delete_message(chat_id, message_id))
+    def edit_message(self, chat_id, msg_id, text, parse_mode="Markdown", reply_markup=None):
+        return self._run(self.rooms._edit_message(chat_id, msg_id, text, parse_mode, reply_markup))
 
-    def reply_message(self, chat_id, message_id, text, parse_mode="Markdown"):
-        return self._run(self.rooms._reply_message(chat_id, message_id, text, parse_mode))
+    def delete_message(self, chat_id, msg_id):
+        return self._run(self.rooms._delete_message(chat_id, msg_id))
 
-    def send_photo(self, chat_id, photo, caption="", parse_mode="Markdown"):
-        return self._run(self.rooms._send_photo(chat_id, photo, caption, parse_mode))
+    def send_photo(self, chat_id, photo, caption=""):
+        return self._run(self.rooms._send_photo(chat_id, photo, caption))
 
-    def send_document(self, chat_id, document, caption="", parse_mode="Markdown"):
-        return self._run(self.rooms._send_document(chat_id, document, caption, parse_mode))
+    def send_document(self, chat_id, doc, caption=""):
+        return self._run(self.rooms._send_document(chat_id, doc, caption))
 
-    def set_my_commands(self, commands):
+    def send_action(self, chat_id, action="typing"):
+        return self._run(self.rooms._send_action(chat_id, action))
+
+    def ban_user(self, chat_id, user_id):
+        return self._run(self.rooms._ban_user(chat_id, user_id))
+
+    def unban_user(self, chat_id, user_id):
+        return self._run(self.rooms._unban_user(chat_id, user_id))
+
+    def promote_user(self, chat_id, user_id):
+        return self._run(self.rooms._promote_user(chat_id, user_id))
+
+    def demote_user(self, chat_id, user_id):
+        return self._run(self.rooms._demote_user(chat_id, user_id))
+
+    def pin_message(self, chat_id, msg_id):
+        return self._run(self.rooms._pin_message(chat_id, msg_id))
+
+    def set_commands(self, commands):
         return self._run(self.rooms._set_my_commands(commands))
 
-    def ask_ai(self, prompt, system_prompt=""):
-        url = f"https://api.pollinations.ai/prompt/{prompt}"
-        if system_prompt:
-            url += f"?system={system_prompt}"
-        response = requests.get(url)
-        return response.text
+    def ask_ai(self, prompt, system="You are a helpful bot."):
+        if not self.ai_key:
+            raise RuntimeError("AI key not set")
+        import requests
+        try:
+            resp = requests.post("https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {self.ai_key}", "Content-Type": "application/json"},
+                json={"model": self.ai_model, "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}], "max_tokens": 1000},
+                timeout=30)
+            return resp.json()["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            return f"AI Error: {e}"
 
-    def broadcast_message(self, text, parse_mode="Markdown"):
-        chat_ids = self.db.get_all_chat_ids()
-        sent_count = 0
-        for chat_id in chat_ids:
+    def broadcast(self, text, parse_mode="Markdown"):
+        ids = self.db.get_all_chat_ids()
+        count = 0
+        for cid in ids:
             try:
-                self.send_message(chat_id, text, parse_mode)
-                sent_count += 1
-            except Exception:
-                pass
-        return {"sent": sent_count, "total": len(chat_ids)}
+                self.send_message(cid, text, parse_mode)
+                count += 1
+            except: pass
+        return count
 
     def send_to_user(self, user_id, text, parse_mode="Markdown"):
         if not self.db.user_exists(user_id):
-            raise Exception("User not found")
+            raise ValueError("User not found")
         return self.send_message(user_id, text, parse_mode)
 
     def enable_ads_filter(self):
-        self._ads_filter_enabled = True
-        print("Ads filter enabled.")
+        self._ads_on = True
 
     def disable_ads_filter(self):
-        self._ads_filter_enabled = False
-        print("Ads filter disabled.")
+        self._ads_on = False
 
-    def auto_send(self, interval, callback_func):
-        def run_auto():
-            while not self._stop_auto:
+    def auto_send(self, interval, func):
+        def loop_auto():
+            while not self._stop:
                 time.sleep(interval)
-                if self._stop_auto:
-                    break
-                result = callback_func()
-                if result:
-                    self.send_message(result["chat_id"], result["text"], result.get("parse_mode", "Markdown"))
-        self._auto_task = threading.Thread(target=run_auto, daemon=True)
-        self._auto_task.start()
-
-    def stop_auto_send(self):
-        self._stop_auto = True
-
-    def _listen_input(self):
-        while not self._stop:
-            try:
-                cmd = input(f"{YELLOW}bot Console >>>{RESET} ").strip().lower()
-                if cmd == "bot.off()":
-                    self.off()
-                    break
-                elif cmd == "bot.pause()":
-                    self._paused = True
-                    print("Bot paused.")
-                elif cmd == "bot.on()":
-                    if self._paused:
-                        self._paused = False
-                        print("Bot resumed.")
-                    else:
-                        print("Bot is already running!")
-                elif cmd == "bot.filter.on()":
-                    self.enable_ads_filter()
-                elif cmd == "bot.filter.off()":
-                    self.disable_ads_filter()
-                elif cmd == "ask ":
-                    prompt = cmd[4:].strip()
-                    if prompt:
-                        answer = self.ask_ai(prompt)
-                        print(f"AI: {answer}")
-                    else:
-                        print("Usage: ask <question>")
-                elif cmd.startswith("broadcast "):
-                    msg = cmd[10:].strip()
-                    if msg:
-                        result = self.broadcast_message(msg)
-                        print(f"Broadcast sent to {result['sent']} of {result['total']} users.")
-                    else:
-                        print("Usage: broadcast <message>")
-                elif cmd.startswith("send "):
-                    parts = cmd.split(" ", 2)
-                    if len(parts) < 3:
-                        print("Usage: send <user_id> <message>")
-                        continue
-                    user_id, msg = parts[1], parts[2].strip()
-                    try:
-                        self.send_to_user(user_id, msg)
-                        print(f"Message sent to {user_id}.")
-                    except Exception as e:
-                        print(f"Error: {e}")
-                else:
-                    print("Invalid command. Valid: bot.off(), bot.pause(), bot.on(), bot.filter.on(), bot.filter.off(), ask <question>, broadcast <message>, send <user_id> <message>")
-            except EOFError:
-                break
+                if self._stop: break
+                data = func()
+                if data: self.send_message(data["chat_id"], data["text"], data.get("parse_mode", "Markdown"))
+        threading.Thread(target=loop_auto, daemon=True).start()
 
     def off(self):
         self._stop = True
-        self.stop_auto_send()
-        self._paused = False
-
-    def _check_ads(self, text):
-        return bool(self._ads_filter_enabled and self._ads_pattern.search(text))
 
     async def _get_updates(self, timeout=5):
         if self._paused:
             await asyncio.sleep(1)
             return []
-        url = f"/bot{self.token}/getUpdates"
-        params = {"timeout": timeout, "offset": self._last_update_id + 1}
-        try:
-            response = await self._http_client.get(url, params=params)
-            if response.status_code == 200:
-                return response.json().get("result", [])
-        except Exception:
-            return []
+        resp = await self._http.get(f"/bot{self.token}/getUpdates", params={"timeout": timeout, "offset": self._last_update + 1})
+        if resp.status_code == 200:
+            return resp.json().get("result", [])
         return []
 
     def run(self, timeout=5):
         print(f"Bot {self.get_me()} is running...")
-        print("Type 'bot.off()' to stop, 'bot.pause()' to pause, 'bot.on()' to resume.")
-        print("Type 'ask <question>' to ask AI, 'broadcast <message>' to send to all, 'send <user_id> <message>' to send to one.")
-        self._input_thread = threading.Thread(target=self._listen_input, daemon=True)
-        self._input_thread.start()
+        print("Commands: bot.off(), bot.pause(), bot.on(), broadcast <msg>, send <id> <msg>, ask <q>")
+        threading.Thread(target=self._console, daemon=True).start()
         while not self._stop:
             updates = self._run(self._get_updates(timeout))
-            for update in updates:
-                if "message" in update:
-                    msg = update["message"]
+            for upd in updates:
+                if "message" in upd:
+                    msg = upd["message"]
                     if msg.get("from", {}).get("is_bot", False) or msg.get("from", {}).get("username") == self.get_me():
-                        self._last_update_id = update["update_id"]
+                        self._last_update = upd["update_id"]
                         continue
-                    self._last_update_id = update["update_id"]
+                    self._last_update = upd["update_id"]
                     chat_id = msg["chat"]["id"]
                     text = msg.get("text", "")
                     username = msg.get("from", {}).get("username", "Unknown")
-                    if self._check_ads(text):
-                        try:
-                            self.delete_message(chat_id, msg["message_id"])
-                            print(f"Deleted ad message from {username}: {text}")
-                        except Exception:
-                            pass
+                    if self._ads_on and self._ads_pattern.search(text):
+                        try: self.delete_message(chat_id, msg["message_id"])
+                        except: pass
                     self.db.save_message(chat_id, text)
-                    self._trigger("message", {"chat_id": chat_id, "text": text, "username": username})
-                elif "callback_query" in update:
-                    cb = update["callback_query"]
-                    self._last_update_id = update["update_id"]
+                    self._fire("message", {"chat_id": chat_id, "text": text, "username": username})
+                elif "callback_query" in upd:
+                    cb = upd["callback_query"]
+                    self._last_update = upd["update_id"]
                     chat_id = cb["message"]["chat"]["id"]
-                    message_id = cb["message"]["message_id"]
-                    callback_data = cb.get("data", "")
+                    msg_id = cb["message"]["message_id"]
+                    data = cb.get("data", "")
                     username = cb.get("from", {}).get("username", "Unknown")
-                    self._trigger("callback", {"chat_id": chat_id, "message_id": message_id, "data": callback_data, "username": username})
+                    self._fire("callback", {"chat_id": chat_id, "message_id": msg_id, "data": data, "username": username})
         self.close()
         print("Bot stopped.")
+
+    def _console(self):
+        while not self._stop:
+            try:
+                cmd = input("bot Console >>> ").strip().lower()
+                if cmd == "bot.off()": self.off(); break
+                elif cmd == "bot.pause()": self._paused = True
+                elif cmd == "bot.on()": self._paused = False
+                elif cmd == "bot.filter.on()": self.enable_ads_filter()
+                elif cmd == "bot.filter.off()": self.disable_ads_filter()
+                elif cmd.startswith("broadcast "): self.broadcast(cmd[10:].strip())
+                elif cmd.startswith("send "):
+                    parts = cmd.split(" ", 2)
+                    if len(parts) >= 3:
+                        try: self.send_to_user(parts[1], parts[2])
+                        except Exception as e: print(e)
+                elif cmd.startswith("ask "): print(self.ask_ai(cmd[4:].strip()))
+                else: print("Invalid")
+            except: break
 
     def get_me(self):
         return self._run(self.auth._login())
 
     def close(self):
-        self.stop_auto_send()
         self.db.close()
-        self._run(self._http_client.aclose())
+        self._run(self._http.aclose())
         self.loop.close()
