@@ -9,18 +9,18 @@ class Database:
         self.path = os.path.join(base, name)
         self.conn = sqlite3.connect(self.path)
         self.c = self.conn.cursor()
-        self.c.execute("CREATE TABLE IF NOT EXISTS msgs (id INTEGER PRIMARY KEY, chat TEXT, text TEXT, ts TEXT)")
+        self.c.execute("CREATE TABLE IF NOT EXISTS msgs (id INTEGER PRIMARY KEY AUTOINCREMENT, chat TEXT, text TEXT, ts TEXT)")
         self.conn.commit()
 
-    def save(self, chat, text):
+    def save_message(self, chat, text):
         self.c.execute("INSERT INTO msgs (chat, text, ts) VALUES (?,?,?)", (chat, text, datetime.now().isoformat()))
         self.conn.commit()
 
-    def chats(self):
+    def get_all_chat_ids(self):
         self.c.execute("SELECT DISTINCT chat FROM msgs")
         return [r[0] for r in self.c.fetchall()]
 
-    def has(self, chat):
+    def user_exists(self, chat):
         self.c.execute("SELECT 1 FROM msgs WHERE chat=? LIMIT 1", (chat,))
         return self.c.fetchone() is not None
 
