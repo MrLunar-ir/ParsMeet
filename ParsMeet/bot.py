@@ -3,21 +3,36 @@ import httpx
 import threading
 import time
 import re
+import requests
 from .api.auth import AuthAPI
 from .api.rooms import RoomsAPI
 from .database import Database
 
 class Markdown:
-    def bold(text): return f"**{text}**"
-    def italic(text): return f"__{text}__"
-    def code(text): return f"`{text}`"
-    def spoiler(text): return f"||{text}||"
-    def link(text, url): return f"[{text}]({url})"
+    @staticmethod
+    def bold(text):
+        return f"**{text}**"
+    @staticmethod
+    def italic(text):
+        return f"__{text}__"
+    @staticmethod
+    def code(text):
+        return f"`{text}`"
+    @staticmethod
+    def spoiler(text):
+        return f"||{text}||"
+    @staticmethod
+    def link(text, url):
+        return f"[{text}]({url})"
+
+YELLOW = "\033[93m"
+RESET = "\033[0m"
 
 class Bot:
     def __init__(self, token, base_url="https://botapi.codemeet.chat", ai_key=None):
         self.token = token
         self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
         self._http = httpx.AsyncClient(base_url=base_url, headers={"Authorization": f"Bearer {token}"}, timeout=None)
         self.auth = AuthAPI(self._http, token)
         self.rooms = RoomsAPI(self._http, token, self.loop)
@@ -50,12 +65,17 @@ class Bot:
             return f
         return wrap(func) if func else wrap
 
+    def on_askai(self, func=None):
+        def wrap(f):
+            self._handlers.setdefault("askai", []).append(f)
+            return f
+        return wrap(func) if func else wrap
+
     def create_callback(self, text, data):
         return {"text": text, "callback_data": data}
 
     def send_message(self, chat_id, text, parse_mode="Markdown", reply_markup=None):
-        res = self._run(self.rooms._send_message(chat_id, text, parse_mode, reply_markup))
-        return res
+        return self._run(self.rooms._send_message(chat_id, text, parse_mode, reply_markup))
 
     def reply_message(self, chat_id, msg_id, text, parse_mode="Markdown"):
         return self._run(self.rooms._reply_message(chat_id, msg_id, text, parse_mode))
@@ -71,9 +91,6 @@ class Bot:
 
     def send_document(self, chat_id, doc, caption=""):
         return self._run(self.rooms._send_document(chat_id, doc, caption))
-
-    def send_action(self, chat_id, action="typing"):
-        return self._run(self.rooms._send_action(chat_id, action))
 
     def ban_user(self, chat_id, user_id):
         return self._run(self.rooms._ban_user(chat_id, user_id))
@@ -93,18 +110,36 @@ class Bot:
     def set_commands(self, commands):
         return self._run(self.rooms._set_my_commands(commands))
 
-    def ask_ai(self, prompt, system="You are a helpful bot."):
-        if not self.ai_key:
-            raise RuntimeError("AI key not set")
-        import requests
-        try:
-            resp = requests.post("https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {self.ai_key}", "Content-Type": "application/json"},
-                json={"model": self.ai_model, "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}], "max_tokens": 1000},
-                timeout=30)
-            return resp.json()["choices"][0]["message"]["content"].strip()
-        except Exception as e:
-            return f"AI Error: {e}"
+    def ask_ai(self, prompt, system_prompt=""):
+        if self.ai_key:
+            url = "https://api.openai.com/v1/chat/completions"
+            headers = {"Authorization": f"Bearer {self.ai_key}", "Content-Type": "application/json"}
+            data = {
+                "model": self.ai_model,
+                "messages": [
+                    {"role": "system", "content": system_prompt or "You are a helpful assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": 500
+            }
+            try:
+                resp = requests.post(url, headers=headers, json=data, timeout=30)
+                if resp.status_code == 200:
+                    return resp.json()["choices"][0]["message"]["content"].strip()
+                return f"Error: {resp.status_code} - {resp.text}"
+            except Exception as e:
+                return f"AI request failed: {str(e)}"
+        else:
+            url = f"https://api.pollinations.ai/prompt/{prompt}"
+            if system_prompt:
+                url += f"?system={system_prompt}"
+            try:
+                resp = requests.get(url, timeout=20)
+                if resp.status_code == 200:
+                    return resp.text.strip()
+                return f"Error: {resp.status_code}"
+            except Exception as e:
+                return f"AI request failed: {str(e)}"
 
     def broadcast(self, text, parse_mode="Markdown"):
         ids = self.db.get_all_chat_ids()
@@ -113,7 +148,8 @@ class Bot:
             try:
                 self.send_message(cid, text, parse_mode)
                 count += 1
-            except: pass
+            except:
+                pass
         return count
 
     def send_to_user(self, user_id, text, parse_mode="Markdown"):
@@ -131,9 +167,11 @@ class Bot:
         def loop_auto():
             while not self._stop:
                 time.sleep(interval)
-                if self._stop: break
+                if self._stop:
+                    break
                 data = func()
-                if data: self.send_message(data["chat_id"], data["text"], data.get("parse_mode", "Markdown"))
+                if data:
+                    self.send_message(data["chat_id"], data["text"], data.get("parse_mode", "Markdown"))
         threading.Thread(target=loop_auto, daemon=True).start()
 
     def off(self):
@@ -165,10 +203,21 @@ class Bot:
                     text = msg.get("text", "")
                     username = msg.get("from", {}).get("username", "Unknown")
                     if self._ads_on and self._ads_pattern.search(text):
-                        try: self.delete_message(chat_id, msg["message_id"])
-                        except: pass
+                        try:
+                            self.delete_message(chat_id, msg["message_id"])
+                        except:
+                            pass
                     self.db.save_message(chat_id, text)
                     self._fire("message", {"chat_id": chat_id, "text": text, "username": username})
+                    if "askai" in self._handlers:
+                        for handler in self._handlers["askai"]:
+                            try:
+                                result = handler(chat_id, text, username)
+                                if result:
+                                    ai_response = self.ask_ai(result)
+                                    self.send_message(chat_id, ai_response)
+                            except Exception as e:
+                                print(f"AI error: {e}")
                 elif "callback_query" in upd:
                     cb = upd["callback_query"]
                     self._last_update = upd["update_id"]
@@ -183,21 +232,33 @@ class Bot:
     def _console(self):
         while not self._stop:
             try:
-                cmd = input("bot Console >>> ").strip().lower()
-                if cmd == "bot.off()": self.off(); break
-                elif cmd == "bot.pause()": self._paused = True
-                elif cmd == "bot.on()": self._paused = False
-                elif cmd == "bot.filter.on()": self.enable_ads_filter()
-                elif cmd == "bot.filter.off()": self.disable_ads_filter()
-                elif cmd.startswith("broadcast "): self.broadcast(cmd[10:].strip())
+                cmd = input(f"{YELLOW}bot Console >>>{RESET} ").strip().lower()
+                if cmd == "bot.off()":
+                    self.off()
+                    break
+                elif cmd == "bot.pause()":
+                    self._paused = True
+                elif cmd == "bot.on()":
+                    self._paused = False
+                elif cmd == "bot.filter.on()":
+                    self.enable_ads_filter()
+                elif cmd == "bot.filter.off()":
+                    self.disable_ads_filter()
+                elif cmd.startswith("broadcast "):
+                    self.broadcast(cmd[10:].strip())
                 elif cmd.startswith("send "):
                     parts = cmd.split(" ", 2)
                     if len(parts) >= 3:
-                        try: self.send_to_user(parts[1], parts[2])
-                        except Exception as e: print(e)
-                elif cmd.startswith("ask "): print(self.ask_ai(cmd[4:].strip()))
-                else: print("Invalid")
-            except: break
+                        try:
+                            self.send_to_user(parts[1], parts[2])
+                        except Exception as e:
+                            print(e)
+                elif cmd.startswith("ask "):
+                    print(self.ask_ai(cmd[4:].strip()))
+                else:
+                    print("Invalid")
+            except:
+                break
 
     def get_me(self):
         return self._run(self.auth._login())
