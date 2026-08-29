@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParsMeet - راهنمای کتابخانه</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Vazirmatn', 'Segoe UI', Tahoma, sans-serif;
+            background: #f0f2f5;
+            color: #333;
+            line-height: 1.8;
+        }
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 15px;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.1);
+            padding: 40px;
+        }
+        h1 {
+            color: #2d3e50;
+            border-bottom: 3px solid #6c5ce7;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            font-size: 2rem;
+        }
+        h2 {
+            color: #6c5ce7;
+            margin-top: 35px;
+            margin-bottom: 15px;
+            font-size: 1.4rem;
+            border-right: 4px solid #6c5ce7;
+            padding-right: 10px;
+        }
+        h3 { color: #444; margin-top: 25px; font-size: 1.1rem; }
+        p { margin: 10px 0; }
+        pre {
+            background: #1e1e2e;
+            color: #cdd6f4;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 15px 0;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            position: relative;
+            direction: ltr;
+            text-align: left;
+        }
+        code { font-family: 'Consolas', 'Monaco', monospace; }
+        .copy-btn {
+            display: block;
+            margin-top: 10px;
+            background: #6c5ce7;
+            color: white;
+            border: none;
+            padding: 6px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-family: 'Vazirmatn', sans-serif;
+            width: fit-content;
+        }
+        .copy-btn:hover { background: #5a4bd1; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        table, th, td { border: 1px solid #ddd; }
+        th, td { padding: 10px; text-align: right; }
+        th { background: #f8f9fa; }
+        a { color: #6c5ce7; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .footer { text-align: center; margin-top: 40px; color: #888; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><i class="fa-solid fa-book"></i> راهنمای کتابخانه ParsMeet</h1>
+
+        <h2><i class="fa-solid fa-download"></i> نصب کتابخانه</h2>
+        <pre><code>pip install ParsMeet</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-robot"></i> ایجاد ربات</h2>
+        <pre><code>import ParsMeet
+bot = ParsMeet.Bot(token="توکن ربات شما", ai_key="کلید AI (اختیاری)")</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-paper-plane"></i> ارسال پیام</h2>
+        <pre><code>bot.send_message(chat_id, "متن پیام")</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-hand-pointer"></i> دکمه شیشه‌ای</h2>
+        <pre><code>btn1 = bot.create_callback("دکمه ۱", "btn1")
+btn2 = bot.create_callback("دکمه ۲", "btn2")
+bot.send_message(chat_id, "متن", reply_markup={"inline_keyboard": [[btn1], [btn2]]})</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-image"></i> ارسال عکس</h2>
+        <pre><code>bot.send_photo(chat_id, "آدرس یا لینک عکس", caption="توضیحات تصویر")</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-file"></i> ارسال فایل</h2>
+        <pre><code>bot.send_document(chat_id, "file_address", caption="file_description")</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-reply"></i> پاسخ به پیام</h2>
+        <pre><code>bot.reply_message(chat_id, message_id, "متن پاسخ")</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-pen-to-square"></i> ویرایش پیام</h2>
+        <pre><code>bot.edit_message(chat_id, message_id, "متن جدید")</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-trash"></i> حذف پیام</h2>
+        <pre><code>bot.delete_message(chat_id, message_id)</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-envelope"></i> دریافت پیام‌ها</h2>
+        <pre><code>@bot.on_message_all()
+def handler(data):
+    chat_id = data["chat_id"]
+    text = data["text"]
+    username = data["username"]</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-mouse-pointer"></i> دریافت کلیک دکمه</h2>
+        <pre><code>@bot.on_callback_query()
+def handler(data):
+    chat_id = data["chat_id"]
+    callback_data = data["data"]</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-brain"></i> هوش مصنوعی خودکار (بدون کامند)</h2>
+        <pre><code>@bot.on_askai()
+def ai_handler(chat_id, text, username):
+    return text  # همین متن به هوش مصنوعی فرستاده می‌شود</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+        <p>با این روش، هر پیامی که کاربر بفرستد مستقیم به هوش مصنوعی رایگان می‌رود و جواب می‌گیرد. نیازی به دستور /ask نیست.</p>
+
+        <h2><i class="fa-solid fa-user-shield"></i> مدیریت گروه</h2>
+        <pre><code>bot.ban_user(chat_id, user_id)
+bot.unban_user(chat_id, user_id)
+bot.promote_user(chat_id, user_id)
+bot.demote_user(chat_id, user_id)
+bot.pin_message(chat_id, message_id)</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-bullhorn"></i> ارسال به همه</h2>
+        <pre><code>bot.broadcast("متن پیام برای همه")</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-play"></i> اجرای ربات</h2>
+        <pre><code>bot.run()</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-power-off"></i> خاموش کردن ربات (از کنسول)</h2>
+        <pre><code>bot.off()</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-circle-check"></i> مثال کامل</h2>
+        <pre><code>import ParsMeet
+
+bot = ParsMeet.Bot(token="توکن ربات شما")
+
+@bot.on_message_all()
+def handler(data):
+    chat_id = data["chat_id"]
+    text = data["text"]
+    if text == "/start":
+        btn = bot.create_callback("منو", "منو")
+        bot.send_message(chat_id, "سلام خوش آمدید", reply_markup={"inline_keyboard": [[btn]]})
+    elif text == "/help":
+        bot.send_message(chat_id, "دستورات: /start و /help")
+
+bot.run()</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-link"></i> لینک‌ها</h2>
+        <p><i class="fa-brands fa-github"></i> Github: <a href="https://github.com/MrLunar-ir/ParsMeet">MrLunar-ir/ParsMeet</a></p>
+        <p><i class="fa-brands fa-python"></i> PyPI: <a href="https://pypi.org/project/ParsMeet/">ParsMeet on PyPI</a></p>
+
+        <div class="footer">Librar python for CodeMeet<i class="fa-solid fa-heart" style="color: #e74c3c;"></i> ParsMeet</div>
+    </div>
+
+    <script>
+        function copyCode(btn) {
+            const pre = btn.previousElementSibling;
+            const code = pre.querySelector('code').innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> کپی شد';
+                setTimeout(() => btn.innerHTML = '<i class="fa-regular fa-copy"></i> کپی', 2000);
+            }).catch(err => {
+                btn.innerHTML = '<i class="fa-solid fa-xmark"></i> خطا';
+            });
+        }
+    </script>
+</body>
+</html>
