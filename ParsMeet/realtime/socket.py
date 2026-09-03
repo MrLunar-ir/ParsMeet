@@ -1,7 +1,7 @@
 import websockets
 
 class RealtimeClient:
-    def __init__(self, room_id: str, token: str):
+    def __init__(self, room_id, token):
         self.room_id = room_id
         self.token = token
 

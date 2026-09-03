@@ -4,5 +4,8 @@ class ParsMeetError(Exception):
 class ParsMeetAuthError(ParsMeetError):
     pass
 
+class ParsMeetNetworkError(ParsMeetError):
+    pass
+
 class ParsMeetRoomNotFoundError(ParsMeetError):
     pass

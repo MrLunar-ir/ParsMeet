@@ -1,133 +1,60 @@
-ParsMeet Library Guide (Version 1.3.0)
+ نصب
 
-Install the library:
-
-```python
+```bash
 pip install ParsMeet
 ```
 
-Create a bot:
-
-```python
-import ParsMeet
-bot = ParsMeet.Bot(token="Your bot token", ai_key="AI key (optional)")
-```
-
-Send a message:
-
-```python
-bot.send_message(chat_id, "Message text")
-```
-
-Send a message with a glass button:
-
-```python
-btn1 = bot.create_callback("Button 1", "btn1")
-btn2 = bot.create_callback("Button 2", "btn2")
-bot.send_message(chat_id, "Text", reply_markup={"inline_keyboard": [[btn1], [btn2]]})
-```
-
-Send a photo:
-
-```python
-bot.send_photo(chat_id, "Photo address or link",  caption="Image description")
-```
-
-Send file:
-
-```python
-bot.send_document(chat_id, "file_address", caption="file_description")
-```
-
-Reply to message:
-
-```python
-bot.reply_message(chat_id, message_id, "reply text")
-```
-
-Edit message:
-
-```python
-bot.edit_message(chat_id, message_id, "new text")
-```
-
-Delete message:
-
-```python
-bot.delete_message(chat_id, message_id)
-```
-
-Receive messages:
-
-```python
-@bot.on_message_all()
-def handler(data):
-chat_id = data["chat_id"]
-text = data["text"]
-username = data["username"]
-```
-
-Receive button clicks:
-
-```python
-@bot.on_callback_query()
-def handler(data):
- chat_id = data["chat_id"]
-callback_data = data["data"]
-```
-
-Group management (optional):
-
-```python
-bot.ban_user(chat_id, user_id)
-bot.unban_user(chat_id, user_id)
-bot.promote_user(chat_id, user_id)
-bot.demote_user(chat_id, user_id)
-bot.pin_message(chat_id, message_id)
-```
-
-Connect to AI:
-
-```python
-response = bot.ask_ai("Your question")
-bot.send_message(chat_id, response)
-```
-
-Send to all:
-
-```python
-bot.broadcast("Message text for everyone")
-```
-
-Run the bot:
-
-```python
-bot.run()
-```
-
-Shut down the bot (from the console):
-
-```python
-bot.off()
-```
-
-Full example (bot  simple):
+شروع سریع
 
 ```python
 import ParsMeet
 
-bot = ParsMeet.Bot(token="Your bot token")
+bot = ParsMeet.Bot(token="توکن شما")
 
 @bot.on_message_all()
 def handler(data):
-chat_id = data["chat_id"]
-text = data["text"]
-
-if text == "/start":
-btn = bot.create_callback("Menu", "menu")
-bot.send_message(chat_id, "Hello, welcome", reply_markup={"inline_keyboard": [[btn]]})
-elif text == "/help":
-bot.send_message(chat_id, "Commands: /start and /help")
+    chat_id = data["chat_id"]
+    text = data["text"]
+    if text == "/start":
+        bot.send_message(chat_id, "سلام! خوش آمدید.")
 
 bot.run()
 ```
+
+امکانات کلیدی
+
+· ارسال و دریافت پیام (متن، عکس، فایل، ویرایش، حذف، ریپلای)
+· دکمه‌های شیشه‌ای (Inline Keyboard) با سازنده‌ی هوشمند KeyboardBuilder
+· هوش مصنوعی (رایگان و یا از طریق OpenAI)
+· مدیریت گروه (بن، آنبن، وارن با سیستم ۳ اخطاره، سکوت، سنجاق)
+· فیلتر تبلیغات و اسپم (تشخیص خودکار لینک و کلمات نامناسب)
+· سیستم نرخ محدودیت (Rate Limit) برای جلوگیری از اسپم
+· کش (Cache) برای ذخیره‌سازی موقت
+· یادآورها (Reminders) با زمان‌بندی خودکار
+· کامندهای سفارشی (Custom Commands) که کاربر می‌تواند به راحتی اضافه کند
+· کامندهای کنسول برای مدیریت ربات از ترمینال
+
+کامندهای سفارشی
+
+با استفاده از متد bot.add_new_custom_cmds() در کنسول، می‌توانید کامندهای جدیدی به فایل custom_cmds.py اضافه کنید.
+
+```python
+# custom_cmds.py
+def setup(bot):
+    @bot.command("test")
+    def test_command(data):
+        bot.send_message(data["chat_id"], "پاسخ تست!")
+```
+
+کامندهای کنسول
+
+· bot.off() – خاموش کردن ربات
+· bot.pause() – مکث
+· bot.on() – ادامه
+· bot.filter.on() – فعال‌سازی فیلتر تبلیغات
+· bot.filter.off() – غیرفعال‌سازی فیلتر
+· broadcast <message> – ارسال پیام همگانی
+· send <user_id> <message> – ارسال به کاربر خاص
+· ask <question> – پرسش از هوش مصنوعی
+· bot.add_new_custom_cmds() – افزودن کامند جدید
+
