@@ -5,6 +5,8 @@ import threading
 import time
 import re
 import os
+import random
+import string
 import importlib.util
 from typing import Optional, Callable, Any, Dict, List
 from .api.auth import AuthAPI
@@ -13,6 +15,12 @@ from .database import Database
 from .utils import KeyboardBuilder, Conversation, Menu, Cache, RateLimit
 
 logger = logging.getLogger("ParsMeet")
+
+try:
+    from PIL import Image, ImageDraw, ImageFont
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
 
 class Markdown:
     @staticmethod
@@ -58,6 +66,7 @@ class Bot:
         self.cache = Cache()
         self.rate_limit = RateLimit(max_requests=5, time_window=1)
         self._antispam_pattern = re.compile(r'(https?://|www\.|@\w+|codemeet\.chat|bit\.ly|tinyurl\.com|ads?|promo|discount|free|http://|t\.co|@)', re.IGNORECASE)
+        self._ai_chat_users = set()
         self._load_custom_commands()
 
     def _run(self, coro):
@@ -115,7 +124,7 @@ class Bot:
     def create_callback(self, text: str, data: str) -> Dict:
         return {"text": text, "callback_data": data}
 
-    def btn_menu(self, text: str = "منو") -> Dict:
+    def btn_menu(self, text: str = "Menu") -> Dict:
         return KeyboardBuilder.btn_menu(text)
 
     def btn_click_menu(self, text: str, action: str) -> Dict:
@@ -179,6 +188,24 @@ class Bot:
     def set_commands(self, commands: List[Dict]) -> Dict:
         return self._run(self.rooms._set_my_commands(commands))
 
+    def send_captcha(self, chat_id: str, user_id: int) -> None:
+        if not PIL_AVAILABLE:
+            self.send_message(chat_id, "Captcha requires Pillow library. Install it with pip install Pillow")
+            return
+        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+        self.cache.set(f"captcha_{user_id}", code, ttl=120)
+        img = Image.new('RGB', (200, 100), color=(230, 230, 230))
+        draw = ImageDraw.Draw(img)
+        try:
+            font = ImageFont.truetype("arial.ttf", 40)
+        except:
+            font = ImageFont.load_default()
+        for _ in range(8):
+            draw.line([(random.randint(0, 200), random.randint(0, 100)), (random.randint(0, 200), random.randint(0, 100))], fill=(200, 0, 0), width=1)
+        draw.text((20, 30), code, font=font, fill=(0, 0, 0))
+        img.save('/tmp/captcha.png')
+        self.send_photo(chat_id, '/tmp/captcha.png', caption="Enter the code shown in the image:")
+
     async def ask_ai_async(self, prompt: str, system_prompt: str = "", user_id: Optional[str] = None) -> str:
         if self.ai_key:
             if user_id and user_id in self.ai_history:
@@ -197,26 +224,37 @@ class Bot:
             except Exception as e:
                 return f"AI request failed: {str(e)}"
         else:
-            try:
-                response = await self._http.post("https://api.airforce/chat/completions", headers={"Content-Type": "application/json"}, json={"model": "gpt-3.5-turbo", "messages": [{"role": "user", "content": prompt}], "max_tokens": 1000}, timeout=60)
-                if response.status_code == 200:
-                    return response.json()["choices"][0]["message"]["content"].strip()
-                else:
-                    return await self._ask_pollinations(prompt, system_prompt)
-            except Exception:
-                return await self._ask_pollinations(prompt, system_prompt)
-
-    async def _ask_pollinations(self, prompt: str, system_prompt: str = ""):
-        try:
-            url = f"https://api.pollinations.ai/prompt/{prompt}"
-            if system_prompt:
-                url += f"?system={system_prompt}"
-            response = await self._http.get(url, timeout=30)
-            if response.status_code == 200:
-                return response.text.strip()
-            return f"Error: {response.status_code}"
-        except Exception as e:
-            return f"AI request failed: {str(e)}"
+            services = [
+                {"name": "keylessai", "url": "https://keylessai.thryx.workers.dev/v1/chat/completions"},
+                {"name": "pollinations", "url": None},
+                {"name": "airforce", "url": "https://api.airforce/chat/completions"},
+                {"name": "openrouter", "url": "https://openrouter.ai/api/v1/chat/completions"}
+            ]
+            for service in services:
+                try:
+                    if service["name"] == "keylessai":
+                        response = await self._http.post(service["url"], headers={"Content-Type": "application/json"}, json={"model": "gpt-4o", "messages": [{"role": "user", "content": prompt}], "max_tokens": 1000}, timeout=60)
+                        if response.status_code == 200:
+                            return response.json()["choices"][0]["message"]["content"].strip()
+                    elif service["name"] == "pollinations":
+                        url = f"https://api.pollinations.ai/prompt/{prompt}"
+                        if system_prompt:
+                            url += f"?system={system_prompt}"
+                        response = await self._http.get(url, timeout=30)
+                        if response.status_code == 200:
+                            return response.text.strip()
+                    elif service["name"] == "airforce":
+                        response = await self._http.post(service["url"], headers={"Content-Type": "application/json"}, json={"model": "gpt-3.5-turbo", "messages": [{"role": "user", "content": prompt}], "max_tokens": 1000}, timeout=60)
+                        if response.status_code == 200:
+                            return response.json()["choices"][0]["message"]["content"].strip()
+                    elif service["name"] == "openrouter":
+                        response = await self._http.post(service["url"], headers={"Content-Type": "application/json"}, json={"model": "openrouter/auto", "messages": [{"role": "user", "content": prompt}], "max_tokens": 1000}, timeout=60)
+                        if response.status_code == 200:
+                            return response.json()["choices"][0]["message"]["content"].strip()
+                except Exception as e:
+                    logger.warning(f"AI service {service['name']} failed: {e}")
+                    continue
+            return "AI services are currently unavailable. Please try again later."
 
     def ask_ai(self, prompt: str, system_prompt: str = "", user_id: Optional[str] = None) -> str:
         return self._run(self.ask_ai_async(prompt, system_prompt, user_id))
@@ -259,6 +297,9 @@ class Bot:
     def off(self):
         self._stop = True
 
+    def stop(self):
+        self.off()
+
     async def _get_updates(self, timeout: int = 5):
         if self._paused:
             await asyncio.sleep(1)
@@ -268,10 +309,12 @@ class Bot:
                 response = await self._http.get(f"/bot{self.token}/getUpdates", params={"timeout": timeout, "offset": self._last_update + 1})
                 if response.status_code == 200:
                     return response.json().get("result", [])
-            except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.ConnectError):
+            except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.ConnectError, httpx.RemoteProtocolError):
                 if attempt == 2:
                     return []
                 await asyncio.sleep(1)
+            except Exception:
+                return []
         return []
 
     def check_reminders(self):
@@ -284,7 +327,7 @@ class Bot:
 
     def run(self, timeout: int = 5):
         print(f"Bot {self.get_me()} is running...")
-        print("Commands: /<custom>, bot.off(), bot.pause(), bot.on(), broadcast <msg>, send <id> <msg>, ask <q>, bot.add_new_custom_cmds()")
+        print("Commands: /<custom>, bot.off(), bot.stop(), bot.pause(), bot.on(), broadcast <msg>, send <id> <msg>, ask <q>, bot.add_new_custom_cmds()")
         threading.Thread(target=self._console, daemon=True).start()
         while not self._stop:
             self.check_reminders()
@@ -319,17 +362,32 @@ class Bot:
                     if text in self._custom_commands:
                         self._custom_commands[text]({"chat_id": chat_id, "text": text, "username": username, "user_id": user_id})
                     else:
-                        self.db.save_message(chat_id, text, username)
-                        self._fire("message", {"chat_id": chat_id, "text": text, "username": username})
-                        if "askai" in self._handlers:
-                            for handler in self._handlers["askai"]:
-                                try:
-                                    result = handler(chat_id, text, username)
-                                    if result:
-                                        ai_response = self.ask_ai(result, user_id=chat_id)
-                                        self.send_message(chat_id, ai_response)
-                                except Exception as e:
-                                    logger.error(f"AI error: {e}")
+                        saved_captcha = self.cache.get(f"captcha_{user_id}")
+                        if saved_captcha:
+                            if text.strip().upper() == saved_captcha:
+                                self.cache.delete(f"captcha_{user_id}")
+                                self.send_message(chat_id, "You have been verified.")
+                            else:
+                                self.send_message(chat_id, "Wrong captcha. Try again.")
+                        elif user_id in self._ai_chat_users:
+                            if text == "/stop":
+                                self._ai_chat_users.discard(user_id)
+                                self.send_message(chat_id, "Chat with AI stopped.")
+                            else:
+                                ai_response = self.ask_ai(text, user_id=user_id)
+                                self.send_message(chat_id, ai_response)
+                        else:
+                            self.db.save_message(chat_id, text, username)
+                            self._fire("message", {"chat_id": chat_id, "text": text, "username": username})
+                            if "askai" in self._handlers:
+                                for handler in self._handlers["askai"]:
+                                    try:
+                                        result = handler(chat_id, text, username)
+                                        if result:
+                                            ai_response = self.ask_ai(result, user_id=chat_id)
+                                            self.send_message(chat_id, ai_response)
+                                    except Exception as e:
+                                        logger.error(f"AI error: {e}")
                 elif "callback_query" in upd:
                     cb = upd["callback_query"]
                     self._last_update = upd["update_id"]
@@ -337,7 +395,14 @@ class Bot:
                     msg_id = cb["message"]["message_id"]
                     data = cb.get("data", "")
                     username = cb.get("from", {}).get("username", "Unknown")
-                    self._fire("callback", {"chat_id": chat_id, "message_id": msg_id, "data": data, "username": username})
+                    user_id = cb.get("from", {}).get("id", 0)
+                    if data == "not_robot":
+                        self.send_captcha(chat_id, user_id)
+                    elif data == "ai_chat":
+                        self._ai_chat_users.add(user_id)
+                        self.send_message(chat_id, "You are now in AI chat mode. Send any text to get AI response. Type /stop to exit.")
+                    else:
+                        self._fire("callback", {"chat_id": chat_id, "message_id": msg_id, "data": data, "username": username})
         self.close()
         print("Bot stopped.")
 
@@ -357,7 +422,7 @@ class Bot:
                     else:
                         print("Command not found")
                 elif cmd.startswith("bot."):
-                    if cmd == "bot.off()":
+                    if cmd in ("bot.off()", "bot.stop()"):
                         self.off()
                         break
                     elif cmd == "bot.pause()":
