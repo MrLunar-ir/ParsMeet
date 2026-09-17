@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ParsMeet - راهنمای نسخه 2.0.0</title>
+    <title>ParsMeet - راهنمای کامل نسخه 2.1.0</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
@@ -12,7 +12,10 @@
         .container { max-width: 950px; margin: 40px auto; background: #fff; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,0.1); padding: 40px; }
         h1 { color: #2d3e50; border-bottom: 3px solid #6c5ce7; padding-bottom: 15px; margin-bottom: 25px; font-size: 2rem; }
         h2 { color: #6c5ce7; margin-top: 35px; margin-bottom: 15px; font-size: 1.4rem; border-right: 4px solid #6c5ce7; padding-right: 10px; }
+        h3 { color: #444; margin-top: 20px; font-size: 1.1rem; }
         p { margin: 10px 0; }
+        .badge { display: inline-block; background: #6c5ce7; color: #fff; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; margin-right: 8px; }
+        .badge.new { background: #00b894; }
         pre { background: #1e1e2e; color: #cdd6f4; padding: 15px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-size: 0.9rem; position: relative; direction: ltr; text-align: left; }
         code { font-family: 'Consolas', 'Monaco', monospace; }
         .copy-btn { display: block; margin-top: 10px; background: #6c5ce7; color: white; border: none; padding: 6px 15px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-family: 'Vazirmatn', sans-serif; width: fit-content; }
@@ -20,41 +23,169 @@
         a { color: #6c5ce7; text-decoration: none; }
         a:hover { text-decoration: underline; }
         .footer { text-align: center; margin-top: 40px; color: #888; font-size: 0.9rem; }
+        .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin: 20px 0; }
+        .feature-card { background: #f8f9fa; border-right: 3px solid #6c5ce7; padding: 15px; border-radius: 8px; }
+        .feature-card i { color: #6c5ce7; margin-left: 8px; }
+        .feature-card strong { display: block; margin-bottom: 5px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1><i class="fa-solid fa-book"></i> راهنمای کتابخانه ParsMeet</h1>
+        <h1><i class="fa-solid fa-book"></i> راهنمای ParsMeet نسخه 2.1.0</h1>
+        <p style="color: #666; font-size: 1.05rem;">اولین و بهترین کتابخانه‌ی بات‌سازی برای CodeMeet با هوش مصنوعی داخلی</p>
 
-        <h2><i class="fa-solid fa-download"></i> نصب کتابخانه</h2>
+        <h2><i class="fa-solid fa-download"></i> نصب</h2>
         <pre><code>pip install ParsMeet</code></pre>
         <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
 
-        <h2><i class="fa-solid fa-robot"></i> ایجاد ربات</h2>
+        <h2><i class="fa-solid fa-sparkles"></i> قابلیت‌های جدید نسخه 2.1.0</h2>
+        <div class="feature-grid">
+            <div class="feature-card"><i class="fa-solid fa-brain"></i><strong>هوش مصنوعی چندگانه <span class="badge new">جدید</span></strong> OpenAI, Gemini, OpenRouter, KeylessAI</div>
+            <div class="feature-card"><i class="fa-solid fa-list-check"></i><strong>FSM (مکالمه چندمرحله‌ای) <span class="badge new">جدید</span></strong> ساخت فرم‌های پیچیده</div>
+            <div class="feature-card"><i class="fa-solid fa-clock"></i><strong>Scheduler <span class="badge new">جدید</span></strong> زمان‌بندی خودکار</div>
+            <div class="feature-card"><i class="fa-solid fa-language"></i><strong>چندزبانه (i18n) <span class="badge new">جدید</span></strong> فارسی، انگلیسی و...</div>
+            <div class="feature-card"><i class="fa-solid fa-globe"></i><strong>Webhook <span class="badge new">جدید</span></strong> برای سرورهای حرفه‌ای</div>
+            <div class="feature-card"><i class="fa-solid fa-puzzle-piece"></i><strong>سیستم Plugin <span class="badge new">جدید</span></strong> افزونه‌پذیر</div>
+            <div class="feature-card"><i class="fa-solid fa-toolbox"></i><strong>CLI Scaffold <span class="badge new">جدید</span></strong> ساخت پروژه با یک دستور</div>
+            <div class="feature-card"><i class="fa-solid fa-chart-line"></i><strong>Dashboard <span class="badge new">جدید</span></strong> آمار زنده‌ی ربات</div>
+        </div>
+
+        <h2><i class="fa-solid fa-robot"></i> شروع سریع</h2>
         <pre><code>import ParsMeet
+from ParsMeet import Filters
 
-bot = ParsMeet.Bot(token="توکن ربات شما", ai_key="کلید هوش مصنوعی (اختیاری)")</code></pre>
+bot = ParsMeet.Bot(
+    token="YOUR_TOKEN",
+    ai_provider="keylessai",
+    ai_memory=True
+)
+
+@bot.on_message(Filters.command & Filters.command_is("start"))
+def start_handler(data):
+    bot.send_message(data["chat_id"], "سلام! من آماده‌ام.")
+
+@bot.on_askai()
+def ai_handler(chat_id, text, username):
+    return text
+
+bot.run()</code></pre>
         <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
 
-        <h2><i class="fa-solid fa-paper-plane"></i> ارسال پیام</h2>
-        <pre><code>bot.send_message(chat_id, "متن پیام")</code></pre>
+        <h2><i class="fa-solid fa-terminal"></i> CLI - ساخت پروژه</h2>
+        <p>با یک دستور، یک پروژه‌ی کامل ربات بساز:</p>
+        <pre><code>parsmeet new mybot
+cd mybot
+python bot.py</code></pre>
         <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
 
-        <h2><i class="fa-solid fa-hand-pointer"></i> دکمه شیشه‌ای</h2>
-        <pre><code>btn1 = bot.create_callback("دکمه ۱", "btn1")
-btn2 = bot.create_callback("دکمه ۲", "btn2")
-bot.send_message(chat_id, "متن", reply_markup={"inline_keyboard": [[btn1], [btn2]]})</code></pre>
+        <h2><i class="fa-solid fa-brain"></i> هوش مصنوعی با حافظه</h2>
+        <pre><code>bot = ParsMeet.Bot(token="...", ai_provider="openai", ai_key="sk-...")
+
+@bot.on_askai()
+def ai_handler(chat_id, text, username):
+    return text
+
+response = bot.ask_ai("سلام، حالت چطوره؟", user_id=chat_id)
+bot.set_ai_provider("gemini", api_key="...")
+bot.clear_ai_memory(user_id=chat_id)</code></pre>
         <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
 
-        <h2><i class="fa-solid fa-image"></i> ارسال عکس و فایل</h2>
-        <pre><code>bot.send_photo(chat_id, "آدرس عکس", caption="توضیح")
-bot.send_document(chat_id, "آدرس فایل", caption="توضیح")</code></pre>
+        <h2><i class="fa-solid fa-wand-magic-sparkles"></i> ابزارهای هوش مصنوعی</h2>
+        <pre><code>summary = bot.ai_summarize(chat_id, messages)
+translation = bot.ai_translate(chat_id, "Hello", "fa")
+is_spam = bot.ai_detect_spam(chat_id, "Buy now!")
+category = bot.ai_classify(chat_id, "سلام", ["احوالپرسی", "سوال"])</code></pre>
         <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
 
-        <h2><i class="fa-solid fa-reply"></i> پاسخ، ویرایش و حذف پیام</h2>
-        <pre><code>bot.reply_message(chat_id, message_id, "متن پاسخ")
-bot.edit_message(chat_id, message_id, "متن جدید")
-bot.delete_message(chat_id, message_id)</code></pre>
+        <h2><i class="fa-solid fa-list-check"></i> FSM - مکالمه چندمرحله‌ای</h2>
+        <pre><code>def ask_name(data, ctx):
+    ctx["name"] = data["text"]
+    return "ask_age"
+
+def ask_age(data, ctx):
+    ctx["age"] = data["text"]
+    bot.send_message(data["chat_id"], f"سلام {ctx['name']}!")
+    return None
+
+bot.add_state("signup", "ask_name", ask_name, "ask_age")
+bot.add_state("signup", "ask_age", ask_age)
+
+@bot.on_message(Filters.command_is("signup"))
+def signup(data):
+    bot.start_conversation(str(data["user_id"]), "signup")</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-clock"></i> Scheduler - زمان‌بندی</h2>
+        <pre><code>bot.scheduler.every("1 hour").do(send_reminder)
+bot.scheduler.at("09:00").do(send_daily_report)
+bot.scheduler.once(60, send_welcome)</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-language"></i> چندزبانه (i18n)</h2>
+        <pre><code>bot.set_locale(user_id, "fa")
+bot.text("welcome", user_id=user_id)
+
+bot.i18n.add_locale("ar", {"welcome": "أهلاً وسهلاً"})</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-puzzle-piece"></i> سیستم Plugin</h2>
+        <p>فایل <code>plugins/myplugin.py</code> بساز:</p>
+        <pre><code>from ParsMeet import Plugin
+
+class MyPlugin(Plugin):
+    name = "myplugin"
+    version = "1.0.0"
+
+    def setup(self, bot):
+        @bot.on_message_all()
+        def handler(data):
+            bot.send_message(data["chat_id"], "Plugin working!")
+
+bot.load_plugins("plugins")</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-user-shield"></i> مدیریت گروه پیشرفته</h2>
+        <pre><code>bot.ban_user(chat_id, user_id)
+bot.unban_user(chat_id, user_id)
+bot.promote_user(chat_id, user_id)
+bot.demote_user(chat_id, user_id)
+bot.pin_message(chat_id, message_id)
+bot.warn_user(chat_id, user_id)  # 3 warns = ban
+bot.set_welcome(chat_id, "خوش آمدید!")
+bot.set_bad_words(["کلمه بد 1", "کلمه بد 2"])</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-shield-halved"></i> امنیت و ضداسپم</h2>
+        <pre><code>bot.enable_ads_filter()  # فیلتر لینک
+bot.anti_link.check(text)
+bot.anti_spam.check(user_id)
+bot.maintenance.enable("در حال به‌روزرسانی...")</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-edit"></i> Filter ترکیبی</h2>
+        <pre><code>from ParsMeet import Filters
+
+@bot.on_message(Filters.text & Filters.group)
+def text_in_group(data):
+    pass
+
+@bot.on_message(Filters.private | Filters.admin)
+def private_or_admin(data):
+    pass</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-keyboard"></i> Keyboard OOP</h2>
+        <pre><code>from ParsMeet import InlineKeyboard, Button
+
+kb = InlineKeyboard()
+kb.row(Button("تایید", "yes"), Button("لغو", "no"))
+bot.send_message(chat_id, "انتخاب کنید:", reply_markup=kb)</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-users"></i> Middleware</h2>
+        <pre><code>from ParsMeet import Logging, Recovery
+
+bot.use(Logging()).use(Recovery())</code></pre>
         <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
 
         <h2><i class="fa-solid fa-envelope"></i> دریافت پیام‌ها</h2>
@@ -62,89 +193,35 @@ bot.delete_message(chat_id, message_id)</code></pre>
 def handler(data):
     chat_id = data["chat_id"]
     text = data["text"]
-    username = data["username"]</code></pre>
+    username = data["username"]
+    user_id = data["user_id"]</code></pre>
         <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
 
-        <h2><i class="fa-solid fa-mouse-pointer"></i> دریافت کلیک روی دکمه</h2>
+        <h2><i class="fa-solid fa-mouse-pointer"></i> دریافت کلیک دکمه</h2>
         <pre><code>@bot.on_callback_query()
-def handler(data):
-    chat_id = data["chat_id"]
-    callback_data = data["data"]</code></pre>
-        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
-
-        <h2><i class="fa-solid fa-brain"></i> هوش مصنوعی خودکار</h2>
-        <pre><code>@bot.on_askai()
-def ai_handler(chat_id, text, username):
-    return text</code></pre>
-        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
-
-        <h2><i class="fa-solid fa-keyboard"></i> منوی پویا (KeyboardBuilder)</h2>
-        <pre><code>from ParsMeet import KeyboardBuilder
-
-keyboard = KeyboardBuilder.create([
-    [("دکمه ۱", "btn1"), ("دکمه ۲", "btn2")],
-    [("دکمه ۳", "btn3")]
-])
-bot.send_message(chat_id, "منو", reply_markup=keyboard)</code></pre>
-        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
-
-        <h2><i class="fa-solid fa-user-shield"></i> مدیریت گروه</h2>
-        <pre><code>bot.ban_user(chat_id, user_id)
-bot.unban_user(chat_id, user_id)
-bot.promote_user(chat_id, user_id)
-bot.demote_user(chat_id, user_id)
-bot.pin_message(chat_id, message_id)
-bot.warn_user(chat_id, user_id)
-bot.set_welcome(chat_id, "خوش آمدید {first_name}")</code></pre>
-        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
-
-        <h2><i class="fa-solid fa-bullhorn"></i> ارسال به همه</h2>
-        <pre><code>bot.broadcast("متن پیام برای همه")</code></pre>
-        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
-
-        <h2><i class="fa-solid fa-play"></i> اجرای ربات</h2>
-        <pre><code>bot.run()</code></pre>
-        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
-
-        <h2><i class="fa-solid fa-power-off"></i> خاموش کردن</h2>
-        <pre><code>bot.off()</code></pre>
-        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
-
-        <h2><i class="fa-solid fa-circle-check"></i> مثال کامل</h2>
-        <pre><code>import ParsMeet
-from ParsMeet import KeyboardBuilder
-
-bot = ParsMeet.Bot(token="توکن شما")
-
-@bot.on_message_all()
-def handler(data):
-    chat_id = data["chat_id"]
-    text = data["text"]
-    if text == "/start":
-        keyboard = KeyboardBuilder.create([
-            [("پشتیبانی", "support"), ("سوالات متداول", "faq")],
-            [("ارتباط با ادمین", "admin")]
-        ])
-        bot.send_message(chat_id, "سلام! چطور می‌تونم کمکتون کنم؟", reply_markup=keyboard)
-    elif text.startswith("سوال"):
-        answer = bot.ask_ai(text)
-        bot.send_message(chat_id, answer)
-
-@bot.on_callback_query()
 def callback(data):
-    if data["data"] == "support":
-        bot.send_message(data["chat_id"], "برای پشتیبانی پیام بفرستید.")
-    elif data["data"] == "admin":
-        bot.send_message(data["chat_id"], "ادمین در حال حاضر آنلاین است.")
+    chat_id = data["chat_id"]
+    callback_data = data["data"]
+    message_id = data["message_id"]</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
 
-bot.run()</code></pre>
+        <h2><i class="fa-solid fa-bullhorn"></i> ارسال همگانی</h2>
+        <pre><code>count = bot.broadcast("پیام برای همه")
+count = bot.queued_broadcast("پیام همگانی امن")</code></pre>
+        <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
+
+        <h2><i class="fa-solid fa-power-off"></i> خاموش کردن از کنسول</h2>
+        <pre><code>bot.off()
+# یا
+bot.stop()</code></pre>
         <button class="copy-btn" onclick="copyCode(this)"><i class="fa-regular fa-copy"></i> کپی</button>
 
         <h2><i class="fa-solid fa-link"></i> لینک‌ها</h2>
-        <p><i class="fa-brands fa-github"></i> Github: <a href="https://github.com/MrLunar-ir/ParsMeet">MrLunar-ir/ParsMeet</a></p>
+        <p><i class="fa-brands fa-github"></i> گیت‌هاب: <a href="https://github.com/MrLunar-ir/ParsMeet">MrLunar-ir/ParsMeet</a></p>
         <p><i class="fa-brands fa-python"></i> PyPI: <a href="https://pypi.org/project/ParsMeet/">ParsMeet on PyPI</a></p>
+        <p><i class="fa-solid fa-paper-plane"></i> کانال: <a href="https://t.me/ParsMeet">@ParsMeet</a></p>
 
-        <div class="footer">ساخته شده با <i class="fa-solid fa-heart" style="color: #e74c3c;"></i> توسط آقای لونار - 2026</div>
+        <div class="footer">ساخته شده با <i class="fa-solid fa-heart" style="color: #e74c3c;"></i> توسط MrLunar-ir - نسخه 2.1.0 - 2026</div>
     </div>
 
     <script>
